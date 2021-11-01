@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="83896688-67f5-4756-a954-becf6dcfc914" >
+		<http:listener-connection host="${http.host}" port="${http.port}" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="f550d38a-a39d-4f13-9bde-ff07f90cd2cc" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${secure::db.user}" password="${secure::db.password}" database="${db.database}" />
+	</db:config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="da0abca3-6971-472e-a744-284c3610d001" />
+	<configuration-properties doc:name="Configuration properties" doc:id="51614977-7d1c-4ecd-8054-b32d9a05aa2e" file="${env}.proprties" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="34b99c4d-7674-4e36-9ee2-906f4191bb49" file="${env}.scure.properties" key="${key}">
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<flow name="scatter-gatherFlow" doc:id="a65f155d-16ec-4d1a-b4fc-d8b9d11d455d" >
+		<http:listener doc:name="Listener" doc:id="6d5f204e-29ec-45e0-9850-2f98e3ef9f88" config-ref="HTTP_Listener_config" path="${http.path}"/>
+		<ee:transform doc:name="Transform Message" doc:id="384f0cff-b468-4f93-aa6e-5709a3aef679" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<scatter-gather doc:name="Scatter-Gather" doc:id="82ad15ad-d5fd-4e6c-9575-9e6fed48110b" >
+			<route >
+				<logger level="INFO" doc:name="Logger" doc:id="d40929d7-772b-4b6d-8184-b18b62cf53fc" message="route1"/>
+				<db:insert doc:name="Insert" doc:id="90676ce4-dc40-4c2b-9575-c31c1e2891bc" config-ref="Database_Config">
+					<db:sql ><![CDATA[INSERT INTO customer_management (name, email, adress, phone)
+VALUES (:name, :email, :adress, :phone)]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	name : payload.name,
+	email : payload.email,
+	adress : payload.adress,
+	phone :payload.phone
+}]]]></db:input-parameters>
+				</db:insert>
+				<ee:transform doc:name="Transform Message" doc:id="4885507b-bf05-4b37-a6ff-b2d750e29210" >
+					<ee:message >
+						<ee:set-payload ><![CDATA["database insert success"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</route>
+			<route >
+				<logger level="INFO" doc:name="Logger" doc:id="545989fb-7a08-4c5f-bfc1-26437ef76078" message="route2"/>
+				<ee:transform doc:name="Transform Message" doc:id="db330e96-74bb-4a8f-b3a1-73aa4531d10e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA["salesforce insert successful"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</route>
+			<route >
+				<logger level="INFO" doc:name="Logger" doc:id="f16fa2d6-2c69-44c1-9101-30ab40b77497" message="route3"/>
+				<ee:transform doc:name="Transform Message" doc:id="74f0a572-fdbc-4d7d-be41-0bde7c60d170" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<file:write doc:name="Write" doc:id="f81bd325-fd85-46b1-83b1-98507dbe9df5" config-ref="File_Config" path="D:\Mulesoft material\inputdata.csv"/>
+				<ee:transform doc:name="Transform Message" doc:id="f65dd503-dc9c-46a6-8093-3538befad56c" >
+					<ee:message >
+						<ee:set-payload ><![CDATA["file insert successful"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="Transform Message" doc:id="1c5bc1cf-8532-4606-9f8b-5abcd06f65c8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	DatabaseResult : payload."0".payload,
+	SalesforceResult : payload."1".payload,
+	FileResult : payload."2".payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
